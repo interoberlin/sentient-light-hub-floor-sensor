@@ -1,11 +1,16 @@
 buildscript {
-    ext.kotlin_version = '1.2.31'
-
+    ext {
+        kotlinVersion = '1.2.20'
+        springBootVersion = '2.0.1.RELEASE'
+    }
     repositories {
+        mavenLocal()
         mavenCentral()
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
+        classpath("org.jetbrains.kotlin:kotlin-allopen:${kotlinVersion}")
     }
 }
 
@@ -13,13 +18,20 @@ group 'berlin.intero'
 version '0.1.0'
 
 apply plugin: 'kotlin'
+apply plugin: 'kotlin-spring'
+apply plugin: 'eclipse'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'war'
+apply plugin: 'io.spring.dependency-management'
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    compile('org.springframework.boot:spring-boot-starter')
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    compile("org.jetbrains.kotlin:kotlin-reflect")
     compile project(':sentient-light-hub-common')
 }
 

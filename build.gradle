@@ -25,13 +25,15 @@ apply plugin: 'war'
 apply plugin: 'io.spring.dependency-management'
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
 dependencies {
+    compile('com.google.code.gson:gson:2.7')
     compile('org.springframework.boot:spring-boot-starter')
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    compile("org.jetbrains.kotlin:kotlin-reflect")
+    compile('org.jetbrains.kotlin:kotlin-stdlib-jdk8')
+    compile('org.jetbrains.kotlin:kotlin-reflect')
     compile project(':sentient-light-hub-common')
 }
 

@@ -35,6 +35,10 @@ class GATTReadSensorScheduledTask {
         log.fine("Show scannedDevices ${Gson().toJson(scannedDevices.map { d -> d.address })}")
         log.fine("Show intendedDevices ${Gson().toJson(intendedDevices?.map { d -> d.address })}")
 
+        if (scannedDevices.isEmpty()) {
+            GATTScanDevicesScheduledTask().scanDevices()
+        }
+
         // Iterate over intended devices
         intendedDevices?.forEach { intendedDevice ->
             try {
@@ -57,10 +61,14 @@ class GATTReadSensorScheduledTask {
                 // Publish values
                 intendedDevice.sensors.forEach { s ->
                     val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${s.checkerboardID}"
-                    val value = parsedValues.getOrElse(s.index) { -1 }.toString()
+                    val value = parsedValues.getOrElse(s.index) { SentientProperties.GATT.INVALID_VALUE }
 
-                    // Call MQTTPublishAsyncTask
-                    SimpleAsyncTaskExecutor().execute(MQTTPublishAsyncTask(topic, value))
+                    log.fine("${SentientProperties.Color.VALUE} ${s.checkerboardID} -> ${value} ${SentientProperties.Color.RESET}")
+
+                    if (value != SentientProperties.GATT.INVALID_VALUE) {
+                        // Call MQTTPublishAsyncTask
+                        SimpleAsyncTaskExecutor().execute(MQTTPublishAsyncTask(topic, value.toString()))
+                    }
                 }
             } catch (ex: Exception) {
                 when (ex) {

@@ -8,7 +8,7 @@ import berlin.intero.sentientlighthub.common.services.TinybService
 import berlin.intero.sentientlighthub.common.tasks.MQTTPublishAsyncTask
 import berlin.intero.sentientlighthubplayground.exceptions.BluetoothConnectionException
 import com.google.gson.Gson
-import org.springframework.core.task.SimpleAsyncTaskExecutor
+import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import tinyb.BluetoothException
@@ -76,7 +76,7 @@ class GATTReadSensorScheduledTask {
                 }
 
                 // Call MQTTPublishAsyncTask
-                SimpleAsyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
+                SyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
             } catch (ex: Exception) {
                 when (ex) {
                     is BluetoothException -> {

@@ -1,6 +1,7 @@
 package berlin.intero.sentientlighthub.floorsensor.tasks.scheduled
 
 import berlin.intero.sentientlighthub.common.SentientProperties
+import berlin.intero.sentientlighthub.common.model.MQTTEvent
 import berlin.intero.sentientlighthub.common.services.ConfigurationService
 import berlin.intero.sentientlighthub.common.services.SentientParserService
 import berlin.intero.sentientlighthub.common.services.TinybService
@@ -58,6 +59,8 @@ class GATTReadSensorScheduledTask {
                 // Parse values
                 val parsedValues = SentientParserService.parse(rawValue)
 
+                val mqttEvents = ArrayList<MQTTEvent>()
+
                 // Publish values
                 intendedDevice.sensors.forEach { s ->
                     val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${s.checkerboardID}"
@@ -65,11 +68,15 @@ class GATTReadSensorScheduledTask {
 
                     log.fine("${SentientProperties.Color.VALUE} ${s.checkerboardID} -> ${value} ${SentientProperties.Color.RESET}")
 
+                    val mqttEvent = MQTTEvent(topic, value.toString())
+
                     if (value != SentientProperties.GATT.INVALID_VALUE) {
-                        // Call MQTTPublishAsyncTask
-                        SimpleAsyncTaskExecutor().execute(MQTTPublishAsyncTask(topic, value.toString()))
+                        mqttEvents.add(mqttEvent)
                     }
                 }
+
+                // Call MQTTPublishAsyncTask
+                SimpleAsyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
             } catch (ex: Exception) {
                 when (ex) {
                     is BluetoothException -> {

@@ -24,11 +24,16 @@ class GATTReadSensorScheduledTask {
 
     companion object {
         private val log: Logger = Logger.getLogger(GATTReadSensorScheduledTask::class.simpleName)
+
+        private var counter = 0
+        private var runtimeMin = Long.MAX_VALUE
+        private var runtimeMax = Long.MIN_VALUE
     }
 
     @Scheduled(fixedDelay = SentientProperties.Frequency.SENSOR_READ_DELAY)
     fun readSensor() {
-        log.info("${SentientProperties.Color.TASK}-- GATT READ SENSOR TASK${SentientProperties.Color.RESET}")
+        val startTime = System.currentTimeMillis()
+        log.info("${SentientProperties.Color.TASK}-- START GATT READ SENSOR TASK${SentientProperties.Color.RESET}")
 
         val scannedDevices = TinybService.scannedDevices
         val intendedDevices = ConfigurationService.sensorConfig?.sensorDevices
@@ -41,7 +46,7 @@ class GATTReadSensorScheduledTask {
         }
 
         // Iterate over intended devices
-        intendedDevices?.forEach { intendedDevice ->
+        intendedDevices?.filter { d -> d.active }?.forEach { intendedDevice ->
             try {
                 log.info("Intended device ${intendedDevice.address}")
 
@@ -62,7 +67,7 @@ class GATTReadSensorScheduledTask {
                 val mqttEvents = ArrayList<MQTTEvent>()
 
                 // Publish values
-                intendedDevice.sensors.forEach { s ->
+                intendedDevice.sensors.filter { s -> s.active }.forEach { s ->
                     val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${s.checkerboardID}"
                     val value = parsedValues.getOrElse(s.index) { SentientProperties.GATT.INVALID_VALUE }
 
@@ -92,5 +97,13 @@ class GATTReadSensorScheduledTask {
                 }
             }
         }
+
+        val endTime = System.currentTimeMillis()
+        val runtime = endTime - startTime
+        if (counter > 0) {
+            if (runtime < runtimeMin) runtimeMin = runtime
+            if (runtime > runtimeMax) runtimeMax = runtime
+        }
+        log.info("${SentientProperties.Color.TASK_END}-- END GATT READ SENSOR TASK${SentientProperties.Color.RESET} counter ${++counter} / ${runtime} millis / min ${runtimeMin} / max ${runtimeMax}")
     }
 }

@@ -33,7 +33,7 @@ class GATTReadSensorScheduledTask {
     @Scheduled(fixedDelay = SentientProperties.Frequency.SENSOR_READ_DELAY)
     fun readSensor() {
         val startTime = System.currentTimeMillis()
-        log.info("${SentientProperties.Color.TASK}-- START GATT READ SENSOR TASK${SentientProperties.Color.RESET}")
+        log.info("${SentientProperties.Color.TASK}-- GATT READ SENSOR TASK${SentientProperties.Color.RESET}")
 
         val scannedDevices = TinybService.scannedDevices
         val intendedDevices = ConfigurationService.sensorConfig?.sensorDevices
@@ -45,8 +45,8 @@ class GATTReadSensorScheduledTask {
             GATTScanDevicesScheduledTask().scanDevices()
         }
 
-        // Iterate over intended devices
-        intendedDevices?.filter { d -> d.active }?.forEach { intendedDevice ->
+        // Iterate over intended devices being enabled
+        intendedDevices?.filter { d -> d.enabled }?.forEach { intendedDevice ->
             try {
                 log.info("Intended device ${intendedDevice.address}")
 
@@ -64,24 +64,33 @@ class GATTReadSensorScheduledTask {
                 // Parse values
                 val parsedValues = SentientParserService.parse(rawValue)
 
+                // Assemble values to be published
                 val mqttEvents = ArrayList<MQTTEvent>()
+                intendedDevice.cables.forEachIndexed { cableIndex, cable ->
 
-                // Publish values
-                intendedDevice.sensors.filter { s -> s.active }.forEach { s ->
-                    val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${s.checkerboardID}"
-                    val value = parsedValues.getOrElse(s.index) { SentientProperties.GATT.INVALID_VALUE }
+                    cable.sensors.forEachIndexed { sensorIndex, sensor ->
 
-                    log.fine("${SentientProperties.Color.VALUE} ${s.checkerboardID} -> ${value} ${SentientProperties.Color.RESET}")
+                        if (cable.enabled && sensor.enabled) {
+                            val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${sensor.checkerboardID}"
+                            val value = parsedValues.getOrElse((cableIndex * SentientProperties.MAX_SENSORS_PER_CABLE) + sensorIndex + 1) { SentientProperties.GATT.INVALID_VALUE }
 
-                    val mqttEvent = MQTTEvent(topic, value.toString())
+                            val mqttEvent = MQTTEvent(topic, value.toString())
 
-                    if (value != SentientProperties.GATT.INVALID_VALUE) {
-                        mqttEvents.add(mqttEvent)
+                            if (value != SentientProperties.GATT.INVALID_VALUE) {
+                                mqttEvents.add(mqttEvent)
+                            }
+                        }
                     }
                 }
 
-                // Call MQTTPublishAsyncTask
-                SyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
+                // Publish values
+                if (mqttEvents.isNotEmpty()) {
+                    // Call MQTTPublishAsyncTask
+                    SyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
+                } else {
+                    log.info(".")
+                    Thread.sleep(SentientProperties.Frequency.UNSUCCESSFUL_TASK_DELAY)
+                }
             } catch (ex: Exception) {
                 when (ex) {
                     is BluetoothException -> {
@@ -104,6 +113,7 @@ class GATTReadSensorScheduledTask {
             if (runtime < runtimeMin) runtimeMin = runtime
             if (runtime > runtimeMax) runtimeMax = runtime
         }
-        log.info("${SentientProperties.Color.TASK_END}-- END GATT READ SENSOR TASK${SentientProperties.Color.RESET} counter ${++counter} / ${runtime} millis / min ${runtimeMin} / max ${runtimeMax}")
+
+        log.info("-- End counter ${++counter} / ${runtime} millis / min ${runtimeMin} / max ${runtimeMax}")
     }
 }

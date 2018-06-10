@@ -6,7 +6,6 @@ import berlin.intero.sentientlighthub.common.services.ConfigurationService
 import berlin.intero.sentientlighthub.common.services.SentientParserService
 import berlin.intero.sentientlighthub.common.services.TinybService
 import berlin.intero.sentientlighthub.common.tasks.MQTTPublishAsyncTask
-import berlin.intero.sentientlighthubplayground.exceptions.BluetoothConnectionException
 import com.google.gson.Gson
 import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.scheduling.annotation.Scheduled
@@ -53,51 +52,50 @@ class GATTReadSensorScheduledTask {
                 val device = scannedDevices.first { d -> d.address == intendedDevice.address }
 
                 // Ensure connection
-                TinybService.ensureConnection(device)
+                val connected = TinybService.ensureConnection(device)
 
-                // Show services
-                // TinybController.showServices(device)
+                if (connected) {
+                    // Show services
+                    // TinybController.showServices(device)
 
-                // Read raw value
-                val rawValue = TinybService.readCharacteristic(device, SentientProperties.GATT.Characteristic.SENSOR)
+                    // Read raw value
+                    val rawValue = TinybService.readCharacteristic(device, SentientProperties.GATT.Characteristic.SENSOR)
 
-                // Parse values
-                val parsedValues = SentientParserService.parse(rawValue)
+                    // Parse values
+                    val parsedValues = SentientParserService.parse(rawValue)
 
-                // Assemble values to be published
-                val mqttEvents = ArrayList<MQTTEvent>()
-                intendedDevice.cables.forEachIndexed { cableIndex, cable ->
+                    // Assemble values to be published
+                    val mqttEvents = ArrayList<MQTTEvent>()
+                    intendedDevice.cables.forEachIndexed { cableIndex, cable ->
 
-                    cable.sensors.forEachIndexed { sensorIndex, sensor ->
+                        cable.sensors.forEachIndexed { sensorIndex, sensor ->
 
-                        if (cable.enabled && sensor.enabled) {
-                            val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${sensor.checkerboardID}"
-                            val value = parsedValues.getOrElse((cableIndex * SentientProperties.MAX_SENSORS_PER_CABLE) + sensorIndex + 1) { SentientProperties.GATT.INVALID_VALUE }
+                            if (cable.enabled && sensor.enabled) {
+                                val topic = "${SentientProperties.MQTT.Topic.SENSOR}/${sensor.checkerboardID}"
+                                val value = parsedValues.getOrElse((cableIndex * SentientProperties.MAX_SENSORS_PER_CABLE) + sensorIndex + 1) { SentientProperties.GATT.INVALID_VALUE }
 
-                            val mqttEvent = MQTTEvent(topic, value.toString())
+                                val mqttEvent = MQTTEvent(topic, value.toString())
 
-                            if (value != SentientProperties.GATT.INVALID_VALUE) {
-                                mqttEvents.add(mqttEvent)
+                                if (value != SentientProperties.GATT.INVALID_VALUE) {
+                                    mqttEvents.add(mqttEvent)
+                                }
                             }
                         }
                     }
-                }
 
-                // Publish values
-                if (mqttEvents.isNotEmpty()) {
-                    // Call MQTTPublishAsyncTask
-                    SyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
-                } else {
-                    log.info(".")
-                    Thread.sleep(SentientProperties.Frequency.UNSUCCESSFUL_TASK_DELAY)
+                    // Publish values
+                    if (mqttEvents.isNotEmpty()) {
+                        // Call MQTTPublishAsyncTask
+                        SyncTaskExecutor().execute(MQTTPublishAsyncTask(mqttEvents))
+                    } else {
+                        log.info(".")
+                        Thread.sleep(SentientProperties.Frequency.UNSUCCESSFUL_TASK_DELAY)
+                    }
                 }
             } catch (ex: Exception) {
                 when (ex) {
                     is BluetoothException -> {
                         log.severe("Generic bluetooth exception")
-                    }
-                    is BluetoothConnectionException -> {
-                        log.severe("Cannot connect to device ${intendedDevice.address}")
                     }
                     is NoSuchElementException -> {
                         log.severe("Cannot find device ${intendedDevice.address}")
